@@ -1,0 +1,24 @@
+# Systemd služba pro News trading bot.
+# Ulož jako /etc/systemd/system/newsbot.service a UPRAV `User` + všechny cesty.
+
+[Unit]
+Description=News trading bot (paper)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jakub
+WorkingDirectory=/home/jakub/news_trading_bot
+# API klíče jako env variables ze souboru, který NENÍ v gitu (.env je v .gitignore).
+# Na serveru ho vytvoř: `cp .env.example .env` a vlož klíče. Pomlčka = nepadej, když chybí.
+EnvironmentFile=-/home/jakub/news_trading_bot/.env
+ExecStart=/home/jakub/news_trading_bot/.venv/bin/python main.py
+# Po pádu se zvedne, ale po naplánovaném týdnu (MAX_RUNTIME_SECONDS) skončí
+# čistě a zůstane stát. Pro běh napořád: config.py MAX_RUNTIME_SECONDS=None
+# + zde Restart=always.
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
