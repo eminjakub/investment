@@ -20,7 +20,7 @@ odhadnout dopad a na základě toho **simuluje** obchody. **Žádné reálné pe
 
 | Soubor | Role |
 |---|---|
-| `ingest.py` | Stahování zpráv (CryptoCompare / CCData, free) |
+| `ingest.py` | Stahování zpráv (veřejné RSS feedy, bez klíče) |
 | `triage.py` | Levný filtr – pustit zprávu k drahému LLM? |
 | `analysis.py` | LLM (OpenAI-kompatibilní, lze zdarma) → strukturovaný odhad dopadu |
 | `risk.py` | Tvrdé pojistky mezi signálem a obchodem |
@@ -70,9 +70,9 @@ sqlite3 trading_log.db \
 ## ⚠️ Důležité
 
 - Edukativní prototyp, **ne investiční rada**.
-- Zprávy bere z **CryptoCompare / CCData** free news API. Vygeneruj si free
-  klíč (https://www.cryptocompare.com/cryptopian/api-keys) a vlož ho do `.env`
-  jako `CRYPTOCOMPARE_API_KEY`. Free tier má rate limity; `ingest.py` parsuje
-  defenzivně. Chceš-li jiný zdroj (RSS, jiné API), měníš jen `fetch_news()`.
+- Zprávy bere z **veřejných RSS feedů** (CoinDesk, Cointelegraph, Decrypt,
+  CryptoBriefing, crypto.news) – zadarmo, **bez API klíče a bez měsíčního
+  limitu**. Tahá z víc zdrojů; když jeden spadne, jede z ostatních. Zdroje
+  upravíš v seznamu `FEEDS` v `ingest.py`; jiný zdroj/API = měníš jen `fetch_news()`.
 - Než bys *kdy* uvažoval o reálných penězích: měsíce v paperu, a pak jen částka,
   kterou si můžeš dovolit ztratit celou.

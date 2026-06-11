@@ -1,8 +1,8 @@
 # Nasazení na server — krok za krokem
 
 Runbook pro spuštění bota na čistém **Ubuntu** serveru. Předpoklad: máš SSH
-přístup (IP + uživatel) a dva klíče — **CryptoCompare** (free) a **LLM klíč**
-(free, Groq/Gemini).
+přístup (IP + uživatel) a jeden klíč — **LLM klíč** (free, Groq/Gemini).
+Zprávy jdou z veřejných RSS feedů, takže žádný news klíč nepotřebuješ.
 
 ---
 
@@ -34,7 +34,6 @@ cp .env.example .env
 nano .env
 ```
 Vyplň a ulož (`Ctrl+O`, `Enter`, `Ctrl+X`):
-- `CRYPTOCOMPARE_API_KEY` — free, vygeneruj na https://www.cryptocompare.com/cryptopian/api-keys
 - `LLM_API_KEY` — **free**, bez platební karty: Groq (https://console.groq.com/keys)
   nebo Gemini (https://aistudio.google.com/apikey). Poskytovatele a model nastavíš
   v `config.py` (`LLM_BASE_URL` + `LLM_MODEL`); default je Groq. Lokální Ollama?
@@ -87,7 +86,8 @@ Přežije odpojení SSH, ale **ne** reboot.
 
 ## Když něco zlobí
 - Služba nestartuje → `journalctl -u newsbot --no-pager | tail -30`
-- Žádné zprávy → zkontroluj `CRYPTOCOMPARE_API_KEY` v `.env`
-- Chyby u cen/obchodů → server potřebuje odchozí HTTPS (Kraken, CryptoCompare, poskytovatel LLM)
+- Žádné zprávy → log z `ingest` ti řekne důvod (síť/DNS/blokace feedu); ověř,
+  že server má odchozí HTTPS na news weby
+- Chyby u cen/obchodů → server potřebuje odchozí HTTPS (Kraken, RSS weby, poskytovatel LLM)
 - Po naplánovaném týdnu (`MAX_RUNTIME_SECONDS` v `config.py`) se služba sama čistě
   zastaví; pro běh napořád dej `MAX_RUNTIME_SECONDS = None` a v unitu `Restart=always`.
