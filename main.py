@@ -33,9 +33,6 @@ def _graceful_stop(signum, frame):
 def main():
     signal.signal(signal.SIGTERM, _graceful_stop)  # ať `systemctl stop` ukončí čistě
 
-    if not config.CRYPTOCOMPARE_API_KEY:
-        print("[pozor] CRYPTOCOMPARE_API_KEY není nastaven – zprávy mohou být "
-              "rate-limited nebo nedostupné (free klíč viz README).")
     if not config.LLM_API_KEY and "localhost" not in config.LLM_BASE_URL:
         print("[pozor] LLM_API_KEY není nastaven – u hostovaných poskytovatelů "
               "(Groq/Gemini) je potřeba (free klíč viz README).")

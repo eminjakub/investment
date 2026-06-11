@@ -1,58 +1,96 @@
-"""Sběr zpráv z CryptoCompare / CCData (free tier).
+"""Sběr zpráv z veřejných RSS feedů crypto médií.
 
-Náhrada za CryptoPanic (ten zrušil free API plán k 1. 4. 2026). CryptoCompare
-nabízí free news endpoint, agreguje 150+ zdrojů a vrací strukturovaný JSON.
-Free API klíč si vygeneruješ na https://www.cryptocompare.com/cryptopian/api-keys
-(endpoint funguje i bez klíče s nižším rate limitem, ale klíč se doporučuje).
+PROČ RSS místo API s klíčem:
+- zadarmo, bez registrace, bez API klíče,
+- BEZ měsíčního limitu (CryptoCompare free = 100 callů/MĚSÍC, což polling bot
+  sní za ~1,5 h – proto to dřív po hodině umřelo).
+- Můžeš pollovat jak často chceš; RSS jsou staticky cachované soubory.
 
-Stahujeme všechny EN zprávy a relevanci řeší až triage (match na sledovaná
-aktiva). Celá závislost na zdroji je schválně jen tady – chceš-li jiný zdroj
-(RSS, jiné API), přepíšeš jen funkci fetch_news().
+Robustnost: stahuje se z víc zdrojů. Když jeden feed spadne / je nedostupný,
+jen se zaloguje a jede se z ostatních. Přidat/ubrat zdroj = uprav FEEDS.
+Jiný typ zdroje (jiné API) = přepíšeš jen tenhle soubor.
 """
 from __future__ import annotations
 
-import requests
+import feedparser
 
 import config
 from models import NewsItem
 
-API_URL = "https://min-api.cryptocompare.com/data/v2/news/"
+# Browser-like UA – některé feedy (Cloudflare) blokují defaultní UA knihoven.
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+# (název zdroje, URL feedu). Když některý dlouhodobě nefunguje, zakomentuj ho.
+FEEDS = [
+    ("Cointelegraph",  "https://cointelegraph.com/rss"),
+    ("Decrypt",        "https://decrypt.co/feed"),
+    ("CryptoBriefing", "https://cryptobriefing.com/feed"),
+    ("crypto.news",    "https://crypto.news/feed"),
+    ("CoinDesk",       "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml"),
+]
+
+# RSS píše "Bitcoin", ne "BTC" → mapujeme klíčová slova na ticker.
+ASSET_KEYWORDS = {
+    "BTC":  ("bitcoin", "btc"),
+    "ETH":  ("ethereum", "ether", "eth"),
+    "SOL":  ("solana", "sol"),
+    "XRP":  ("xrp", "ripple"),
+    "DOGE": ("dogecoin", "doge"),
+}
+
+
+def _detect_assets(text: str) -> list[str]:
+    """Z titulku/textu vytáhne, kterých sledovaných aktiv se zpráva týká."""
+    t = text.lower()
+    found = []
+    for ticker, kws in ASSET_KEYWORDS.items():
+        if ticker in config.TRACKED_ASSETS and any(kw in t for kw in kws):
+            found.append(ticker)
+    return found
 
 
 def fetch_news(seen_ids: set[str]) -> list[NewsItem]:
-    """Vrátí nové (dosud neviděné) zprávy."""
-    headers = {}
-    if config.CRYPTOCOMPARE_API_KEY:
-        headers["Authorization"] = f"Apikey {config.CRYPTOCOMPARE_API_KEY}"
+    """Vrátí nové (dosud neviděné) zprávy ze všech feedů.
 
-    try:
-        resp = requests.get(API_URL, params={"lang": "EN"},
-                            headers=headers, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:  # síť/parse chyba nesmí položit týdenní běh
-        print(f"[ingest] chyba při stahování zpráv: {e}")
-        return []
-
+    Chyby jednotlivých feedů se jen zalogují, smyčka pokračuje dál.
+    """
     items: list[NewsItem] = []
-    for post in data.get("Data", []):
-        pid = str(post.get("id", ""))
-        if not pid or pid in seen_ids:
+    total_entries = 0
+    ok_feeds = 0
+
+    for name, url in FEEDS:
+        try:
+            parsed = feedparser.parse(url, agent=_UA)
+        except Exception as e:
+            print(f"[ingest] feed {name}: chyba {e}")
             continue
-        seen_ids.add(pid)
 
-        # kategorie jsou pipe-separated, např. "BTC|ETH|Trading"
-        cats = (post.get("categories", "") or "").upper().split("|")
-        currencies = [c for c in cats if c in config.TRACKED_ASSETS]
+        if parsed.bozo and not parsed.entries:
+            print(f"[ingest] feed {name}: nenačten "
+                  f"({parsed.get('bozo_exception', '?')})")
+            continue
 
-        source = (post.get("source_info") or {}).get("name") or post.get("source", "")
+        ok_feeds += 1
+        total_entries += len(parsed.entries)
+        for entry in parsed.entries:
+            pid = entry.get("id") or entry.get("link", "")
+            if not pid or pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            title = entry.get("title", "")
+            summary = entry.get("summary", "")
+            items.append(NewsItem(
+                id=pid,
+                title=title,
+                url=entry.get("link", ""),
+                source=name,
+                currencies=_detect_assets(f"{title} {summary}"),
+                published_at=str(entry.get("published", "")),
+            ))
 
-        items.append(NewsItem(
-            id=pid,
-            title=post.get("title", ""),
-            url=post.get("url", ""),
-            source=source,
-            currencies=currencies,
-            published_at=str(post.get("published_on", "")),
-        ))
+    if ok_feeds == 0:
+        print("[ingest] POZOR: nenačten žádný feed (síť/DNS/blokace?).")
+    elif total_entries == 0:
+        print("[ingest] feedy načteny, ale 0 položek.")
     return items

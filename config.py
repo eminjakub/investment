@@ -19,7 +19,7 @@ except ImportError:
     pass
 
 # --- API klíče (z proměnných prostředí) ---
-CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")  # free, viz README
+# Zprávy jdou z veřejných RSS feedů → žádný news klíč není potřeba (viz ingest.py).
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")                      # free, viz README
 
 # --- Sledovaná aktiva (whitelist = zároveň likviditní pojistka) ---
