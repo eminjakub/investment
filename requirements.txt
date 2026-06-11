@@ -1,4 +1,4 @@
 openai
 ccxt
-requests
+feedparser
 python-dotenv
