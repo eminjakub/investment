@@ -76,4 +76,4 @@ POLL_INTERVAL_SECONDS = 60      # jak často tahat nové zprávy
 TICK_INTERVAL_SECONDS = 30      # jak často přepočítávat pozice / outcomy
 HEARTBEAT_SECONDS = 600         # jak často vypsat "žiju" status
 MAX_RUNTIME_SECONDS = 7 * 24 * 3600   # auto-stop po týdnu (None = běž napořád)
-DB_PATH = "trading_log.db"
+DB_PATH = os.getenv("DB_PATH", "trading_log.db")  # na hostingu nasměruj na persistent volume
